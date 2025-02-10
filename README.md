@@ -1,3 +1,9 @@
+
+name: Shadow Sincross
+eid: sas9375
+bitbucketid: shadow Sincross
+comments: <Comments, if any>
+
 Code examples for Cloud Computing course
 -----------------------------------------
 
@@ -5,6 +11,7 @@ This repository contains samples and examples demonstrating cloud resource provi
 for Amazon AWS and Google Cloud Platform (GCP).
 
 Steps
+
 ------
 
 1) Create virtual environment
