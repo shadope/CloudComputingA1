@@ -139,14 +139,15 @@ class S3Handler:
 
         # 3. SDK call
         #    - When uploading the source_file_name and add it to object's meta-data
-        response = self.client.put_object(
-    Bucket=bucket_name,
-    Key=source_file_name,
+#         response = self.client.put_object(
+#     Bucket=bucket_name,
+#     Key=source_file_name,
 
-    Metadata={
-        'name': 'source_file_name'
-    }
-)
+#     Metadata={
+#         'name': 'source_file_name'
+#     }
+# )
+        self.client.upload_file(source_file_name, bucket_name,  'test1.txt')
 
         # Success response
         # operation_successful = ('File %s uploaded to directory %s.' % (source_file_name, bucket_name))
@@ -162,11 +163,20 @@ class S3Handler:
         # Parameter Validation
         
         # SDK Call
+        # response = self.client.get_object(
+        #     Bucket=bucket_name,
+        #     Key=dest_object_name,
+
+        #     Metadata={
+        #         'name': 'source_file_name'
+        #     }
+        # )
+
+        self.client.download_file(bucket_name, dest_object_name, 'my_local_image.txt')
 
         # Success response
         # operation_successful = ('File %s downloaded from directory %s.' % (dest_object_name, bucket_name))
 
-        return self._error_messages('not_implemented')
 
 
     def delete(self, dest_object_name, bucket_name):
@@ -221,8 +231,8 @@ class S3Handler:
             # Use self._error_messages['incorrect_parameter_number'] if number of parameters is less
             # than number of compulsory parameters
             source_file_name = ''
-            bucket_name = ''
-            dest_object_name = ''
+            bucket_name = parts[2]
+            dest_object_name = parts[1]
             response = self.download(dest_object_name, bucket_name, source_file_name)
         elif parts[0] == 'delete':
             dest_object_name = ''
