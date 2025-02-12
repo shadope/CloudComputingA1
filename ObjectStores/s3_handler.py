@@ -8,7 +8,7 @@ import traceback
 LOG_FILE_NAME = 'output.log'
 
 # Change region to match with the default region that you setup when configuring your AWS CLI
-REGION = 'us-west-2'
+REGION = 'us-east-1'
 
 class S3Handler:
     """S3 handler."""
@@ -94,11 +94,41 @@ class S3Handler:
 
     def listdir(self, bucket_name):
         # If bucket_name is provided, check that bucket exits.
-        
+        print("woah")
+        if not bucket_name:
+            print("1")
+            paginator = self.client.get_paginator('list_buckets')
+            print("2")
+            response_iterator = paginator.paginate(
+                Prefix='',
+                BucketRegion='us-east-1',
+                PaginationConfig={
+                    'MaxItems': 123,
+                    'PageSize': 123
+                }
+            )
+            print("3")
+            #iterate through all of the buckets
+            for page in response_iterator:
+                if 'Buckets' in page:
+                    for bucket in page['Buckets']:
+                        print("Bucket Name:", bucket['Name'])
+            return
+        else:
+            try:
+                if self._get(bucket_name):
+                    response = self.client.list_objects_v2(Bucket=bucket_name)
+                    object_names = [obj['Key'] for obj in response['Contents']]
+                    return object_names
+                    if 'Contents' not in response:
+                        return 'No objects found in the bucket.'
+            except Exception as e:
+                print(e)
+                raise e
         # If bucket_name is empty then display the names of all the buckets
         
         # If bucket_name is provided then display the names of all objects in the bucket
-        return self._error_messages('not_implemented')
+        # return self._error_messages('not_implemented')
 
     def upload(self, source_file_name, bucket_name, dest_object_name=''):
         # 1. Parameter Validation
@@ -197,7 +227,9 @@ class S3Handler:
             bucket_name = ''
             response = self.find(pattern, bucket_name)
         elif parts[0] == 'listdir':
-            bucket_name = ''
+            bucket_name = ""
+            if len(parts) > 1:
+                bucket_name = parts[1]
             response = self.listdir(bucket_name)
         else:
             response = "Command not recognized."
