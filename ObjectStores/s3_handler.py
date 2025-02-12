@@ -196,7 +196,9 @@ class S3Handler:
         
         # Success response
         # operation_successful = ("Directory %s deleted." % bucket_name)
-        
+        response = self.client.delete_bucket(
+                Bucket=bucket_name
+            )
         return self._error_messages('not_implemented')
 
 
@@ -243,7 +245,7 @@ class S3Handler:
             bucket_name = parts[2]
             response = self.delete(dest_object_name, bucket_name)
         elif parts[0] == 'deletedir':
-            bucket_name = ''
+            bucket_name = parts[1]
             response = self.deletedir(bucket_name)
         elif parts[0] == 'find':
             pattern = ''
