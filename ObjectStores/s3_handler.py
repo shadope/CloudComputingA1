@@ -183,7 +183,11 @@ class S3Handler:
         
         # Success response
         # operation_successful = ('File %s deleted from directory %s.' % (dest_object_name, bucket_name))
-        
+        response = self.client.delete_object(
+            Bucket=bucket_name,
+            Key=dest_object_name
+            )
+
         return self._error_messages('not_implemented')
 
 
@@ -235,8 +239,8 @@ class S3Handler:
             dest_object_name = parts[1]
             response = self.download(dest_object_name, bucket_name, source_file_name)
         elif parts[0] == 'delete':
-            dest_object_name = ''
-            bucket_name = ''
+            dest_object_name = parts[1]
+            bucket_name = parts[2]
             response = self.delete(dest_object_name, bucket_name)
         elif parts[0] == 'deletedir':
             bucket_name = ''
