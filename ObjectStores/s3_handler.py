@@ -82,8 +82,7 @@ class S3Handler:
         try:
             if self._get(bucket_name):
                 return self._error_messages('bucket_name_exists')
-            self.client.create_bucket(Bucket=bucket_name,
-                                      CreateBucketConfiguration={'LocationConstraint': REGION})
+            self.client.create_bucket(Bucket=bucket_name)
         except Exception as e:
             print(e)
             raise e
@@ -204,8 +203,24 @@ class S3Handler:
 
     def find(self, pattern, bucket_name=''):
         # Return object names that match the given pattern
-
-        
+        print("hi3")
+        paginator = self.client.get_paginator('list_buckets')
+        response_iterator = paginator.paginate(
+                Prefix='',
+                BucketRegion='us-east-1',
+                PaginationConfig={
+                    'MaxItems': 123,
+                    'PageSize': 123
+                }
+            )
+            #iterate through all of the buckets
+        print("hi2")
+        for page in response_iterator:
+            if 'Buckets' in page:
+                for bucket in page['Buckets']:
+                    if pattern in bucket['Name']:
+                        print("hi1")
+                        print("Bucket Name:", bucket['Name'])
         return self._error_messages('not_implemented')
 
 
@@ -248,8 +263,8 @@ class S3Handler:
             bucket_name = parts[1]
             response = self.deletedir(bucket_name)
         elif parts[0] == 'find':
-            pattern = ''
-            bucket_name = ''
+            pattern = parts[1]
+            bucket_name = ""
             response = self.find(pattern, bucket_name)
         elif parts[0] == 'listdir':
             bucket_name = ""
