@@ -80,7 +80,6 @@ class S3Handler:
         #directory name cannot be empty
         if not bucket_name:
             return self._error_messages('bucket_name_empty')
-
         try:
             #directory already exists
             if self._get(bucket_name):
@@ -98,20 +97,11 @@ class S3Handler:
         # If bucket_name is provided, check that bucket exits.
         if not bucket_name:
             #if the user gave no bucket name
-            paginator = self.client.get_paginator('list_buckets')
-            response_iterator = paginator.paginate(
-                Prefix='',
-                BucketRegion='us-east-1',
-                PaginationConfig={
-                    'MaxItems': 123,
-                    'PageSize': 123
-                }
+            response = self.client.list_buckets(
+                MaxBuckets=123
             )
-            #iterate through all of the buckets
-            for page in response_iterator:
-                if 'Buckets' in page:
-                    for bucket in page['Buckets']:
-                        print("Bucket Name:", bucket['Name'])
+            for content in response['Buckets']:
+                print(content['Name'])
             return
         else:
             #we were given a bucket name, see if it exists
@@ -120,16 +110,19 @@ class S3Handler:
                     response = self.client.list_objects_v2(Bucket=bucket_name)
                     object_names = [obj['Key'] for obj in response['Contents']]
                     return object_names
+                else:
+                     return self._error_messages('non_existent_bucket')
             except Exception as e:
                 #the bucket did not exist, sad :(
+                response_code = e.response['Error']['Code']
+                if response_code == '404':
+                    return self._error_messages('bucket_name_exists')
                 print(e)
                 raise e
-        # If bucket_name is empty then display the names of all the buckets
-        
-        # If bucket_name is provided then display the names of all objects in the bucket
-        # return self._error_messages('not_implemented')
 
     def upload(self, source_file_name, bucket_name, dest_object_name=''):
+        print("Current working directory:", os.path.dirname(os.path.abspath(__file__)))
+
         # 1. Parameter Validation
         #    - source_file_name exits in current directory
         #    - bucket_name exists
@@ -149,7 +142,8 @@ class S3Handler:
         try:
             #check if the bucket exits
             if self._get(bucket_name):
-                self.client.upload_file(source_file_name, bucket_name,  destName)
+                fileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), source_file_name)
+                self.client.upload_file(fileName, bucket_name,  destName)
                 operation_successful = ('File %s uploaded to directory %s.' % (source_file_name, bucket_name))
         except Exception as e:
             # return self._error_messages('bucket_name_empty')
@@ -176,6 +170,7 @@ class S3Handler:
         if source_file_name:
             fileName = source_file_name
         #if we have a duplicate, save it as a backup
+        fileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), source_file_name)
         if os.path.isfile(fileName):
             fileName = os.path.splitext(fileName)[0] + ".bak"
             print("bakL: ", fileName)
