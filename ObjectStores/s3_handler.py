@@ -76,10 +76,13 @@ class S3Handler:
             return False
 
     def createdir(self, bucket_name):
+
+        #directory name cannot be empty
         if not bucket_name:
             return self._error_messages('bucket_name_empty')
 
         try:
+            #directory already exists
             if self._get(bucket_name):
                 return self._error_messages('bucket_name_exists')
             self.client.create_bucket(Bucket=bucket_name)
@@ -117,8 +120,6 @@ class S3Handler:
                     response = self.client.list_objects_v2(Bucket=bucket_name)
                     object_names = [obj['Key'] for obj in response['Contents']]
                     return object_names
-                    if 'Contents' not in response:
-                        return 'No objects found in the bucket.'
             except Exception as e:
                 #the bucket did not exist, sad :(
                 print(e)
@@ -132,24 +133,33 @@ class S3Handler:
         # 1. Parameter Validation
         #    - source_file_name exits in current directory
         #    - bucket_name exists
-        if not os.path.isfile(source_file_name):
-            pass
+
+        #source file could not be found
+        # if not os.path.isfile(source_file_name):
+        #     return self._error_messages('missing_source_file')
+    
+        destName = source_file_name
+        #bucket name can not be empty
+        print("bucket name: ", bucket_name)
+        if not bucket_name:
+            return self._error_messages('bucket_name_empty')
+        if dest_object_name:
+            destName = dest_object_name
+
+        try:
+            #check if the bucket exits
+            if self._get(bucket_name):
+                self.client.upload_file(source_file_name, bucket_name,  destName)
+                operation_successful = ('File %s uploaded to directory %s.' % (source_file_name, bucket_name))
+        except Exception as e:
+            # return self._error_messages('bucket_name_empty')
+            print(e)
+            raise e
+            
         # 2. If dest_object_name is not specified then use the source_file_name as dest_object_name
 
         # 3. SDK call
         #    - When uploading the source_file_name and add it to object's meta-data
-#         response = self.client.put_object(
-#     Bucket=bucket_name,
-#     Key=source_file_name,
-
-#     Metadata={
-#         'name': 'source_file_name'
-#     }
-# )
-        self.client.upload_file(source_file_name, bucket_name,  'test1.txt')
-
-        # Success response
-        # operation_successful = ('File %s uploaded to directory %s.' % (source_file_name, bucket_name))
 
     
 
@@ -162,16 +172,27 @@ class S3Handler:
         # Parameter Validation
         
         # SDK Call
-        # response = self.client.get_object(
-        #     Bucket=bucket_name,
-        #     Key=dest_object_name,
-
-        #     Metadata={
-        #         'name': 'source_file_name'
-        #     }
-        # )
-
-        self.client.download_file(bucket_name, dest_object_name, 'my_local_image.txt')
+        fileName = dest_object_name
+        if source_file_name:
+            fileName = source_file_name
+        #if we have a duplicate, save it as a backup
+        if os.path.isfile(fileName):
+            fileName = os.path.splitext(fileName)[0] + ".bak"
+            print("bakL: ", fileName)
+        print("name: ", fileName)
+        try:
+            #directory and source file exist
+            if self._get(bucket_name):
+                self.client.download_file(bucket_name, dest_object_name, fileName)
+                operation_successful = ('File %s downloaded from directory %s.' % (dest_object_name, bucket_name))
+            else:
+                #bucket does not exist
+                return self._error_messages('non_existent_bucket')
+        except Exception as e:
+            #check to see if we have no dest file
+            print(e)
+            raise e
+        
 
         # Success response
         # operation_successful = ('File %s downloaded from directory %s.' % (dest_object_name, bucket_name))
@@ -182,10 +203,21 @@ class S3Handler:
         
         # Success response
         # operation_successful = ('File %s deleted from directory %s.' % (dest_object_name, bucket_name))
-        response = self.client.delete_object(
+
+        if self._get(bucket_name):
+            try:
+                response = self.client.delete_object(
             Bucket=bucket_name,
             Key=dest_object_name
             )
+            except Exception as e:
+            #check to see if we have no dest file
+                print(e)
+                raise e
+
+        else:
+            #bucket does not exist
+            return self._error_messages('non_existent_bucket')
 
         return self._error_messages('not_implemented')
 
@@ -195,32 +227,53 @@ class S3Handler:
         
         # Success response
         # operation_successful = ("Directory %s deleted." % bucket_name)
-        response = self.client.delete_bucket(
-                Bucket=bucket_name
-            )
-        return self._error_messages('not_implemented')
+        if self._get(bucket_name):
+            try:
+                response = self.client.delete_bucket(
+                        Bucket=bucket_name
+                    )
+                operation_successful = ("Directory %s deleted." % bucket_name)
+                return  operation_successful
+            except Exception as e:
+                #check to see if we have no dest file
+                print(e)
+                raise e
+        else:
+            return self._error_messages('non_existent_bucket')
+        
 
 
     def find(self, pattern, bucket_name=''):
         # Return object names that match the given pattern
-        print("hi3")
-        paginator = self.client.get_paginator('list_buckets')
-        response_iterator = paginator.paginate(
-                Prefix='',
-                BucketRegion='us-east-1',
-                PaginationConfig={
-                    'MaxItems': 123,
-                    'PageSize': 123
-                }
-            )
-            #iterate through all of the buckets
-        print("hi2")
-        for page in response_iterator:
-            if 'Buckets' in page:
-                for bucket in page['Buckets']:
-                    if pattern in bucket['Name']:
-                        print("hi1")
-                        print("Bucket Name:", bucket['Name'])
+
+        #no bucket name provided, go through names of the buckets
+        if bucket_name == '':
+            paginator = self.client.get_paginator('list_buckets')
+            response_iterator = paginator.paginate(
+                    Prefix='',
+                    BucketRegion='us-east-1',
+                    PaginationConfig={
+                        'MaxItems': 123,
+                        'PageSize': 123
+                    }
+                )
+                #iterate through all of the buckets
+            for page in response_iterator:
+                if 'Buckets' in page:
+                    for bucket in page['Buckets']:
+                        if pattern in bucket['Name']:
+                            print("Bucket Name:", bucket['Name'])
+        else:
+            #we were given a bucket
+            if self._get(bucket_name):
+                curBucket = self.client.Bucket(bucket_name)
+                objects = curBucket.objects.all()
+                for obj in objects:
+                    if pattern in obj.key:
+                        print("File Name: ", obj.key)
+            else:
+                return self._error_messages('non_existent_bucket')
+
         return self._error_messages('not_implemented')
 
 
@@ -244,14 +297,20 @@ class S3Handler:
             # than number of compulsory parameters
             source_file_name = parts[1]
             bucket_name = parts[2]
-            dest_object_name = ''
+            if len(parts) >  3:
+                dest_object_name = parts[3]
+            else:
+                dest_object_name = ''
             response = self.upload(source_file_name, bucket_name, dest_object_name)
         elif parts[0] == 'download':
             # Figure out parameters from command_string
             # dest_object_name and bucket_name are compulsory; source_file_name is optional
             # Use self._error_messages['incorrect_parameter_number'] if number of parameters is less
             # than number of compulsory parameters
-            source_file_name = ''
+            if len(parts) > 3:
+                source_file_name = parts[3]
+            else:
+                source_file_name = ''
             bucket_name = parts[2]
             dest_object_name = parts[1]
             response = self.download(dest_object_name, bucket_name, source_file_name)
