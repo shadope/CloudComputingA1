@@ -247,7 +247,7 @@ class S3Handler:
         # Return object names that match the given pattern
 
         #no bucket name provided, go through names of the buckets
-        if bucket_name == '':
+        if not bucket_name:
             paginator = self.client.get_paginator('list_buckets')
             response_iterator = paginator.paginate(
                     Prefix='',
@@ -266,11 +266,13 @@ class S3Handler:
         else:
             #we were given a bucket
             if self._get(bucket_name):
-                curBucket = self.client.Bucket(bucket_name)
-                objects = curBucket.objects.all()
-                for obj in objects:
-                    if pattern in obj.key:
-                        print("File Name: ", obj.key)
+                response = self.client.list_objects(Bucket = bucket_name)
+
+                for content in response['Contents']:
+                    if pattern in content ['Key']:
+                        print("File Name: ", content['Key'])
+                    
+                
             else:
                 return self._error_messages('non_existent_bucket')
 
@@ -323,7 +325,10 @@ class S3Handler:
             response = self.deletedir(bucket_name)
         elif parts[0] == 'find':
             pattern = parts[1]
-            bucket_name = ""
+            if len(parts) > 2 :
+                bucket_name = parts[2]
+            else:
+                bucket_name = ""
             response = self.find(pattern, bucket_name)
         elif parts[0] == 'listdir':
             bucket_name = ""
