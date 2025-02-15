@@ -101,6 +101,8 @@ class S3Handler:
                 MaxBuckets=123
             )
             buckets = []
+            if 'Contents' not in response:
+                return buckets
             for content in response['Buckets']:
                 buckets.append(content['Name'])
             return buckets
@@ -110,6 +112,8 @@ class S3Handler:
                 if self._get(bucket_name):
                     response = self.client.list_objects(Bucket = bucket_name)
                     keys = []
+                    if 'Contents' not in response:
+                        return keys
                     for content in response['Contents']:
                         #print(content['Key'])
                         keys.append(content['Key'])
@@ -126,19 +130,9 @@ class S3Handler:
                 raise e
 
     def upload(self, source_file_name, bucket_name, dest_object_name=''):
-        print("Current working directory:", os.path.dirname(os.path.abspath(__file__)))
 
-        # 1. Parameter Validation
-        #    - source_file_name exits in current directory
-        #    - bucket_name exists
-
-        #source file could not be found
-        # if not os.path.isfile(source_file_name):
-        #     return self._error_messages('missing_source_file')
-    
         destName = source_file_name
         #bucket name can not be empty
-        print("bucket name: ", bucket_name)
         if not bucket_name:
             return self._error_messages('bucket_name_empty')
         if dest_object_name:
@@ -188,12 +182,12 @@ class S3Handler:
         fileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), source_file_name)
         if os.path.isfile(fileName):
             fileName = os.path.splitext(fileName)[0] + ".bak"
-        print("name: ", fileName)
         try:
             #directory and source file exist
             if self._get(bucket_name):
                 self.client.download_file(bucket_name, dest_object_name, fileName)
                 operation_successful = ('File %s downloaded from directory %s.' % (dest_object_name, bucket_name))
+                return operation_successful
             else:
                 #bucket does not exist
                 return self._error_messages('non_existent_bucket')
@@ -227,7 +221,8 @@ class S3Handler:
             Bucket=bucket_name,
             Key=dest_object_name
             )
-
+                operation_successful = ('File %s deleted from directory %s.' % (dest_object_name, bucket_name))
+                return operation_successful
             except Exception as e:
             #check to see if we have no dest file
                 response_code = e.response['Error']['Code']
@@ -274,18 +269,26 @@ class S3Handler:
             response = self.client.list_buckets(
                 MaxBuckets=123
             )
+            buckets = []
+            if 'Contents' not in response:
+                return buckets
             for content in response['Buckets']:
                 if pattern in content['Name']:
-                    print(content['Name'])
+                    # print(content['Name'])
+                    buckets.append(content['Name'])
                 #iterate through all of the buckets
         else:
             #we were given a bucket
             if self._get(bucket_name):
                 response = self.client.list_objects(Bucket = bucket_name)
-
+                keys = []
+                if 'Contents' not in response:
+                    return keys
                 for content in response['Contents']:
                     if pattern in content ['Key']:
-                        print("File Name: ", content['Key'])
+                        # print("File Name: ", content['Key'])
+                        keys.append(content['Key'])
+                return keys
                     
                 
             else:
