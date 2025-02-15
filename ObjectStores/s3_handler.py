@@ -100,16 +100,21 @@ class S3Handler:
             response = self.client.list_buckets(
                 MaxBuckets=123
             )
+            buckets = []
             for content in response['Buckets']:
-                print(content['Name'])
-            return
+                buckets.append(content['Name'])
+            return buckets
         else:
             #we were given a bucket name, see if it exists
             try:
                 if self._get(bucket_name):
-                    response = self.client.list_objects_v2(Bucket=bucket_name)
-                    object_names = [obj['Key'] for obj in response['Contents']]
-                    return object_names
+                    response = self.client.list_objects(Bucket = bucket_name)
+                    keys = []
+                    for content in response['Contents']:
+                        #print(content['Key'])
+                        keys.append(content['Key'])
+                    return keys
+
                 else:
                      return self._error_messages('non_existent_bucket')
             except Exception as e:
@@ -138,15 +143,25 @@ class S3Handler:
             return self._error_messages('bucket_name_empty')
         if dest_object_name:
             destName = dest_object_name
-
+        fileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), source_file_name)
+        if not os.path.isfile(fileName):
+            return self._error_messages('missing_source_file')
         try:
             #check if the bucket exits
             if self._get(bucket_name):
                 fileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), source_file_name)
                 self.client.upload_file(fileName, bucket_name,  destName)
                 operation_successful = ('File %s uploaded to directory %s.' % (source_file_name, bucket_name))
+                return operation_successful
+            else:
+                return self._error_messages('non_existent_bucket')
+
         except Exception as e:
             # return self._error_messages('bucket_name_empty')
+            response_code = e.response['Error']['Code']
+            print("e response: ", e.response)
+            if response_code == '404':
+                return self._error_messages('missing_source_file')
             print(e)
             raise e
             
@@ -173,7 +188,6 @@ class S3Handler:
         fileName = os.path.join(os.path.dirname(os.path.abspath(__file__)), source_file_name)
         if os.path.isfile(fileName):
             fileName = os.path.splitext(fileName)[0] + ".bak"
-            print("bakL: ", fileName)
         print("name: ", fileName)
         try:
             #directory and source file exist
@@ -185,6 +199,9 @@ class S3Handler:
                 return self._error_messages('non_existent_bucket')
         except Exception as e:
             #check to see if we have no dest file
+            response_code = e.response['Error']['Code']
+            if response_code == '404':
+                return self._error_messages('non_existent_object')
             print(e)
             raise e
         
@@ -199,22 +216,30 @@ class S3Handler:
         # Success response
         # operation_successful = ('File %s deleted from directory %s.' % (dest_object_name, bucket_name))
 
+
         if self._get(bucket_name):
             try:
+                response = self.client.get_object(
+                Bucket=bucket_name,
+                Key=dest_object_name
+            )
                 response = self.client.delete_object(
             Bucket=bucket_name,
             Key=dest_object_name
             )
+
             except Exception as e:
             #check to see if we have no dest file
+                response_code = e.response['Error']['Code']
+                if response_code == 'NoSuchKey':
+                    return self._error_messages('non_existent_object')
+
                 print(e)
                 raise e
 
         else:
             #bucket does not exist
             return self._error_messages('non_existent_bucket')
-
-        return self._error_messages('not_implemented')
 
 
     def deletedir(self, bucket_name):
@@ -231,8 +256,11 @@ class S3Handler:
                 return  operation_successful
             except Exception as e:
                 #check to see if we have no dest file
+                response_code = e.response['Error']['Code']
+                if response_code == 'BucketNotEmpty':
+                    return self._error_messages('non_empty_bucket')
                 print(e)
-                raise e
+                raise e 
         else:
             return self._error_messages('non_existent_bucket')
         
@@ -243,21 +271,13 @@ class S3Handler:
 
         #no bucket name provided, go through names of the buckets
         if not bucket_name:
-            paginator = self.client.get_paginator('list_buckets')
-            response_iterator = paginator.paginate(
-                    Prefix='',
-                    BucketRegion='us-east-1',
-                    PaginationConfig={
-                        'MaxItems': 123,
-                        'PageSize': 123
-                    }
-                )
+            response = self.client.list_buckets(
+                MaxBuckets=123
+            )
+            for content in response['Buckets']:
+                if pattern in content['Name']:
+                    print(content['Name'])
                 #iterate through all of the buckets
-            for page in response_iterator:
-                if 'Buckets' in page:
-                    for bucket in page['Buckets']:
-                        if pattern in bucket['Name']:
-                            print("Bucket Name:", bucket['Name'])
         else:
             #we were given a bucket
             if self._get(bucket_name):
@@ -271,7 +291,6 @@ class S3Handler:
             else:
                 return self._error_messages('non_existent_bucket')
 
-        return self._error_messages('not_implemented')
 
 
     def dispatch(self, command_string):
